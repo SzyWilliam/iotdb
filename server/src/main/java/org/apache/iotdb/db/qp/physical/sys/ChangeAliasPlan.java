@@ -87,6 +87,7 @@ public class ChangeAliasPlan extends PhysicalPlan {
 
   @Override
   public void deserialize(ByteBuffer buffer) throws IllegalPathException {
+    int type = buffer.get();
     path = new PartialPath(readString(buffer));
     alias = readString(buffer);
   }

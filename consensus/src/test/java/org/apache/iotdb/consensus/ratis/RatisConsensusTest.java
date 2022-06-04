@@ -30,6 +30,7 @@ import org.apache.iotdb.consensus.common.response.ConsensusReadResponse;
 import org.apache.iotdb.consensus.common.response.ConsensusWriteResponse;
 import org.apache.iotdb.consensus.config.ConsensusConfig;
 
+import org.apache.iotdb.consensus.config.RatisConfig;
 import org.apache.ratis.util.FileUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -58,6 +59,20 @@ public class RatisConsensusTest {
   CountDownLatch latch;
 
   private void makeServers() throws IOException {
+    RatisConfig ratisConfig = RatisConfig.newBuilder()
+            .setLog(
+                    RatisConfig.Log.newBuilder()
+                            .setPurgeGap(1)
+                            .setPurgeUptoSnapshotIndex(true)
+                            .build()
+            )
+            .setSnapshot(
+                    RatisConfig.Snapshot.newBuilder()
+                            .setAutoTriggerEnabled(true)
+                            .setAutoTriggerThreshold(5)
+                            .build()
+            )
+            .build();
     for (int i = 0; i < 3; i++) {
       stateMachines.add(new TestUtils.IntegerCounter());
       int finalI = i;
@@ -67,6 +82,7 @@ public class RatisConsensusTest {
                   ConsensusConfig.newBuilder()
                       .setThisNode(peers.get(i).getEndpoint())
                       .setStorageDir(peersStorage.get(i).getAbsolutePath())
+                      .setRatisConfig(ratisConfig)
                       .build(),
                   groupId -> stateMachines.get(finalI))
               .orElseThrow(

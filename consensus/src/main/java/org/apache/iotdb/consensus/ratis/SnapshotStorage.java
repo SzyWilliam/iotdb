@@ -36,8 +36,11 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -90,6 +93,40 @@ public class SnapshotStorage implements StateMachineStorage {
     return snapshots[snapshots.length - 1].toFile();
   }
 
+  public List<Path> fetchAllFilesRecursivelyIn(File rootDir) {
+    List<Path> allFiles = new ArrayList<>();
+    try {
+      Files.walkFileTree(rootDir.toPath(), new FileVisitor<Path>() {
+        @Override
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+          if (attrs.isRegularFile()) {
+            allFiles.add(file);
+          }
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+          return FileVisitResult.TERMINATE;
+        }
+
+        @Override
+        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+          return FileVisitResult.CONTINUE;
+        }
+      });
+    } catch (IOException e) {
+      logger.debug("recursively fetch {} failed due to {}", rootDir, e);
+      return new ArrayList<>();
+    }
+    return allFiles;
+  }
+
   @Override
   public SnapshotInfo getLatestSnapshot() {
     File latestSnapshotDir = findLatestSnapshotDir();
@@ -99,15 +136,14 @@ public class SnapshotStorage implements StateMachineStorage {
     TermIndex snapshotTermIndex = Utils.getTermIndexFromDir(latestSnapshotDir);
 
     List<FileInfo> fileInfos = new ArrayList<>();
-    for (File file : Objects.requireNonNull(latestSnapshotDir.listFiles())) {
-      Path filePath = file.toPath();
+    for (Path path : fetchAllFilesRecursivelyIn(latestSnapshotDir.getAbsoluteFile())) {
       MD5Hash fileHash = null;
       try {
-        fileHash = MD5FileUtil.computeMd5ForFile(file);
+        fileHash = MD5FileUtil.computeMd5ForFile(path.toFile());
       } catch (IOException e) {
         logger.error("read file info failed for snapshot file ", e);
       }
-      FileInfo fileInfo = new FileInfo(filePath, fileHash);
+      FileInfo fileInfo = new FileInfo(path, fileHash);
       fileInfos.add(fileInfo);
     }
 
@@ -121,13 +157,13 @@ public class SnapshotStorage implements StateMachineStorage {
   @Override
   public void cleanupOldSnapshots(SnapshotRetentionPolicy snapshotRetentionPolicy)
       throws IOException {
-    Path[] sortedSnapshotDirs = getSortedSnapshotDirPaths();
-    if (sortedSnapshotDirs == null || sortedSnapshotDirs.length == 0) {
-      return;
-    }
-    for (int i = 0; i < sortedSnapshotDirs.length - 1; i++) {
-      FileUtils.deleteFully(sortedSnapshotDirs[i]);
-    }
+//    Path[] sortedSnapshotDirs = getSortedSnapshotDirPaths();
+//    if (sortedSnapshotDirs == null || sortedSnapshotDirs.length == 0) {
+//      return;
+//    }
+//    for (int i = 0; i < sortedSnapshotDirs.length - 1; i++) {
+//      FileUtils.deleteFully(sortedSnapshotDirs[i]);
+//    }
   }
 
   public File getStateMachineDir() {
@@ -198,6 +234,7 @@ public class SnapshotStorage implements StateMachineStorage {
       }
 
       for (File file : snapshotFiles) {
+        if (file.equals(snapshotDir)) continue;
         boolean success = file.renameTo(new File(snapshotDir + File.separator + file.getName()));
         if (!success) {
           logger.warn(

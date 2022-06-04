@@ -36,6 +36,8 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -103,11 +105,17 @@ public class TestUtils {
     @Override
     public boolean takeSnapshot(File snapshotDir) {
       File snapshot = new File(snapshotDir.getAbsolutePath() + File.separator + "snapshot");
-      try (FileWriter writer = new FileWriter(snapshot)) {
-        writer.write(String.valueOf(integer.get()));
-      } catch (IOException e) {
-        logger.error("cannot open file writer of {}", snapshot);
-        return false;
+      File snapshotInFolder = new File(snapshotDir.getAbsolutePath() + File.separator + "data" + File.separator + "snapshot.backup");
+      snapshotInFolder.getParentFile().mkdirs();
+      List<File> allSnapshots = new ArrayList<>();
+      Collections.addAll(allSnapshots, snapshot, snapshotInFolder);
+      for (File file: allSnapshots) {
+         try (FileWriter writer = new FileWriter(file)) {
+          writer.write(String.valueOf(integer.get()));
+        } catch (IOException e) {
+          logger.error("cannot open file writer of {}", file);
+          return false;
+        }
       }
       return true;
     }

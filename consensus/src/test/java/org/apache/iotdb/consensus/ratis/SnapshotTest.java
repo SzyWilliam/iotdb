@@ -75,6 +75,7 @@ public class SnapshotTest {
 
   @Before
   public void setUp() throws IOException {
+    System.out.println(testDir.getAbsolutePath());
     FileUtils.createDirectories(testDir);
   }
 
